@@ -1,22 +1,23 @@
+using OfficeOpenXml;
+using System.Text.Json;
+
 
 namespace StringsToSheets
 {
-    public class Program
+    class Program
     {
-        public static void Main(string[] args)
+        static void Main(string[] args)
         {
+            ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+
             var builder = WebApplication.CreateBuilder(args);
 
-            // Add services to the container.
-
-            builder.Services.AddControllers();
-            // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
+            builder.Services.AddAuthorization();
 
             var app = builder.Build();
 
-            // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())
             {
                 app.UseSwagger();
@@ -24,13 +25,36 @@ namespace StringsToSheets
             }
 
             app.UseHttpsRedirection();
-
             app.UseAuthorization();
 
 
-            app.MapControllers();
+            app.MapPost("/create-sheet", async (HttpContext context) =>
+            {
+                string requestBody;
+                using (StreamReader reader = new StreamReader(context.Request.Body))
+                {
+                    requestBody = await reader.ReadToEndAsync();
+                }
+
+                string[] strings = JsonSerializer.Deserialize<string[]>(requestBody);
+
+
+                string path = Path.Combine(Directory.GetCurrentDirectory(), "StringsSheet.xlsx");
+                var package = new ExcelPackage(new FileInfo(path));
+
+                ExcelWorksheet resultSheet = package.Workbook.Worksheets.Add("StringsSheet");
+
+                for (int i = 0; i < strings.Length; i++)
+                {
+                    resultSheet.Cells[i + 1, 1].Value = strings[i];
+                }
+
+                package.Save();
+                context.Response.StatusCode = 200;
+            });
 
             app.Run();
         }
+
     }
 }
